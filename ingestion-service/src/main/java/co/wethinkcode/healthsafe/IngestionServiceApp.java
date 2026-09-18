@@ -122,9 +122,7 @@ public class IngestionServiceApp {
         }
  
         if (parsed > 50) {
-            // Real hospital wards don't have 50+ beds in one ward in this dataset's
-            // scale - a value like 2023 is almost certainly bad data (e.g. a year),
-            // not a real bed count.
+            
             return new BedsResult(null,
                     "bedsAvailable value (" + parsed + ") looks unrealistic - flagged for follow-up");
         }
@@ -132,12 +130,7 @@ public class IngestionServiceApp {
         return new BedsResult(parsed, null);
     }
  
-    /**
-     * Merges records that share the same wardId (after normalization) but were
-     * entered as separate rows - e.g. "W-05" and "w-05" in the source data are
-     * the same real ward. When merged records disagree on bedsAvailable, the
-     * conflict is documented in the notes rather than silently discarded.
-     */
+
     private static List<WardRecord> mergeDuplicates(List<WardRecord> records) {
         Map<String, WardRecord> byId = new LinkedHashMap<>();
  
