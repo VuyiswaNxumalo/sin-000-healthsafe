@@ -111,6 +111,44 @@ public class StaffingServiceApp {
     }
 
 
-
+    @SuppressWarnings("unchecked")
+    private static int fetchAlertLevel() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ALERT_LEVEL_SERVICE_URL))
+                .GET()
+                .build();
+ 
+        HttpResponse<String> response = httpClient.send(
+                request, HttpResponse.BodyHandlers.ofString());
+ 
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("alert-level-service returned status " + response.statusCode());
+        }
+ 
+        Map<String, Object> body = mapper.readValue(response.body(), Map.class);
+        return (Integer) body.get("level");
+    }
+ 
+    /**
+     * Higher Emergency Status means more doctors on call:
+     *   0-2 (routine)     -> 1 doctor
+     *   3-5 (elevated)     -> 2 doctors
+     *   6-8 (code blue)    -> all doctors in the department's roster
+     */
+    private static List<String> buildSchedule(String department, int alertLevel) {
+        List<String> roster = DOCTOR_ROSTER.getOrDefault(department, DEFAULT_ROSTER);
+ 
+        int doctorsNeeded;
+        if (alertLevel <= 2) {
+            doctorsNeeded = 1;
+        } else if (alertLevel <= 5) {
+            doctorsNeeded = 2;
+        } else {
+            doctorsNeeded = roster.size();
+        }
+ 
+        doctorsNeeded = Math.min(doctorsNeeded, roster.size());
+        return roster.subList(0, doctorsNeeded);
+    }
 
 }
