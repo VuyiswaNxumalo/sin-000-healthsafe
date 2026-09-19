@@ -85,4 +85,32 @@ public class StaffingServiceApp {
         // whenever a schedule is computed/changed, so ward-service can react
         // asynchronously instead of staffing-service being polled directly.
     }
+
+     
+    private static class WardNotFoundException extends RuntimeException {}
+ 
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> fetchWard(String wardId) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(WARD_SERVICE_URL + "/wards/" + wardId))
+                .GET()
+                .build();
+ 
+        HttpResponse<String> response = httpClient.send(
+                request, HttpResponse.BodyHandlers.ofString());
+ 
+        if (response.statusCode() == 404) {
+            throw new WardNotFoundException();
+        }
+ 
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("ward-service returned status " + response.statusCode());
+        }
+ 
+        return mapper.readValue(response.body(), Map.class);
+    }
+
+
+
+
 }
