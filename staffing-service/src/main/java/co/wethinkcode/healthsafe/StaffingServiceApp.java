@@ -1,7 +1,10 @@
 package co.wethinkcode.healthsafe;
 
+import co.wethinkcode.healthsafe.mq.MqConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.javalin.Javalin;
+import jakarta.jms.*;
+import org.apache.activemq.ActiveMQConnectionFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -73,12 +76,15 @@ public class StaffingServiceApp {
             String department = (String) ward.get("department");
             List<String> onCallDoctors = buildSchedule(department, alertLevel);
 
-            ctx.json(Map.of(
-                    "wardId", wardId,
-                    "department", department,
-                    "alertLevel", alertLevel,
-                    "onCallDoctors", onCallDoctors
-            ));
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("wardId", wardId);
+            result.put("department", department);
+            result.put("alertLevel", alertLevel);
+            result.put("onCallDoctors", onCallDoctors);
+
+            publishStaffingEvent(result);
+
+            ctx.json(result);
         });
 
         // MQ TODO: publishes to ActiveMQ topic MqConfig.TOPIC at MqConfig.BROKER_URL
@@ -151,4 +157,26 @@ public class StaffingServiceApp {
         return roster.subList(0, doctorsNeeded);
     }
 
+
+    private static void publishStaffingEvent(Map<String, Object> event) {
+        try {
+            ConnectionFactory factory = new ActiveMQConnectionFactory(MqConfig.BROKER_URL);
+            try (Connection connection = factory.createConnection()) {
+                connection.start();
+                Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+                Topic topic = session.createTopic(MqConfig.TOPIC);
+                MessageProducer producer = session.createProducer(topic);
+
+                String json = mapper.writeValueAsString(event);
+                TextMessage message = session.createTextMessage(json);
+                producer.send(message);
+
+                System.out.println("Published staffing event for ward "
+                        + event.get("wardId") + " to " + MqConfig.TOPIC);
+            }
+        } catch (Exception e) {
+            System.err.println("Could not publish staffing event (continuing anyway): "
+                    + e.getMessage());
+        }
+    }
 }
