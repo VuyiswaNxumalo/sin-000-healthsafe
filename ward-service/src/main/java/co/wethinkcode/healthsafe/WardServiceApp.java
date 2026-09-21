@@ -1,7 +1,10 @@
 package co.wethinkcode.healthsafe;
 
+import co.wethinkcode.healthsafe.mq.MqConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.javalin.Javalin;
+import jakarta.jms.*;
+import org.apache.activemq.ActiveMQConnectionFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -10,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class WardServiceApp {
 
@@ -25,6 +29,11 @@ public class WardServiceApp {
             Integer bedsAvailable,
             String notes
     ) {}
+
+    private static final Map<String, Map<String, Object>> latestStaffingByWard =
+            new ConcurrentHashMap<>();
+
+    private static final ObjectMapper mqMapper = new ObjectMapper();
 
     public static void main(String[] args) throws Exception {
         Map<String, WardRecord> wardsById = fetchWardsFromIngestion();
@@ -50,8 +59,56 @@ public class WardServiceApp {
             ctx.json(ward);
         });
 
-        // MQ TODO: subscribes to ActiveMQ topic MqConfig.TOPIC at MqConfig.BROKER_URL
+        app.get("/wards/{id}/staffing", ctx -> {
+            String id = ctx.pathParam("id").toUpperCase();
+            Map<String, Object> update = latestStaffingByWard.get(id);
+
+            if (update == null) {
+                ctx.status(404).json(Map.of(
+                        "error", "No staffing update received yet for this ward",
+                        "wardId", id
+                ));
+                return;
+            }
+
+            ctx.json(update);
+        });
+
+        subscribeToStaffingEvents();
+
         // MQ TODO: publishes to ActiveMQ queue MqConfig.QUEUE on equipment failure detection
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void subscribeToStaffingEvents() {
+        try {
+            ConnectionFactory factory = new ActiveMQConnectionFactory(MqConfig.BROKER_URL);
+            Connection connection = factory.createConnection();
+            connection.start();
+
+            Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            Topic topic = session.createTopic(MqConfig.TOPIC);
+            MessageConsumer consumer = session.createConsumer(topic);
+
+            consumer.setMessageListener(message -> {
+                try {
+                    if (message instanceof TextMessage textMessage) {
+                        String json = textMessage.getText();
+                        Map<String, Object> event = mqMapper.readValue(json, Map.class);
+                        String wardId = (String) event.get("wardId");
+                        latestStaffingByWard.put(wardId, event);
+                        System.out.println("Received staffing update for " + wardId);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to process staffing event: " + e.getMessage());
+                }
+            });
+
+            System.out.println("Subscribed to " + MqConfig.TOPIC);
+        } catch (Exception e) {
+            System.err.println("Could not subscribe to " + MqConfig.TOPIC
+                    + " (continuing without it): " + e.getMessage());
+        }
     }
 
     /**
