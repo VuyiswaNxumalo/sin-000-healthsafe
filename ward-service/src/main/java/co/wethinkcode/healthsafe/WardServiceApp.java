@@ -3,7 +3,7 @@ package co.wethinkcode.healthsafe;
 import co.wethinkcode.healthsafe.mq.MqConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.javalin.Javalin;
-import jakarta.jms.*;
+import javax.jms.*;
 import org.apache.activemq.ActiveMQConnectionFactory;
 
 import java.net.URI;
