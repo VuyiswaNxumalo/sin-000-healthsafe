@@ -74,9 +74,66 @@ public class WardServiceApp {
             ctx.json(update);
         });
 
-        subscribeToStaffingEvents();
+        app.post("/wards/{id}/equipment-failure", ctx -> {
+            String id = ctx.pathParam("id").toUpperCase();
 
-        // MQ TODO: publishes to ActiveMQ queue MqConfig.QUEUE on equipment failure detection
+            if (!wardsById.containsKey(id)) {
+                ctx.status(404).json(Map.of(
+                        "error", "Ward not found",
+                        "wardId", id
+                ));
+                return;
+            }
+
+            Map<String, Object> body = ctx.bodyAsClass(Map.class);
+            String equipment = (String) body.getOrDefault("equipment", "Unknown equipment");
+            String description = (String) body.getOrDefault("description", "No description provided");
+
+            Map<String, Object> alert = new LinkedHashMap<>();
+            alert.put("wardId", id);
+            alert.put("equipment", equipment);
+            alert.put("description", description);
+
+            boolean published = publishEquipmentFailure(alert);
+
+            if (published) {
+                ctx.status(202).json(Map.of(
+                        "status", "Equipment failure alert published",
+                        "wardId", id
+                ));
+            } else {
+                ctx.status(503).json(Map.of(
+                        "error", "Could not publish alert - equipment-failure-queue unavailable",
+                        "wardId", id
+                ));
+            }
+        });
+
+        subscribeToStaffingEvents();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean publishEquipmentFailure(Map<String, Object> alert) {
+        try {
+            ConnectionFactory factory = new ActiveMQConnectionFactory(MqConfig.BROKER_URL);
+            try (Connection connection = factory.createConnection()) {
+                connection.start();
+                Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+                Queue queue = session.createQueue(MqConfig.QUEUE);
+                MessageProducer producer = session.createProducer(queue);
+
+                String json = mqMapper.writeValueAsString(alert);
+                TextMessage message = session.createTextMessage(json);
+                producer.send(message);
+
+                System.out.println("Published equipment failure alert for ward "
+                        + alert.get("wardId") + " to " + MqConfig.QUEUE);
+                return true;
+            }
+        } catch (Exception e) {
+            System.err.println("Could not publish equipment failure alert: " + e.getMessage());
+            return false;
+        }
     }
 
     @SuppressWarnings("unchecked")
