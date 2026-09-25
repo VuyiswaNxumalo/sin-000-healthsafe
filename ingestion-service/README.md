@@ -79,9 +79,7 @@ mvn package
 ```
 java -jar target/ingestion-service.jar
 ```
-
-Listens on port `7030`. Currently just exposes `/health` — the actual CSV
-parsing/cleaning logic is a TODO.
+Listens on port `7030`. Exposes `/health` and `GET /wards`, which returns the cleaned ward records.
 
 ## Test
 
