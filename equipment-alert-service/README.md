@@ -48,7 +48,7 @@ mvn package
 java -jar target/equipment-alert-service.jar
 ```
 
-Listens on port `7034`.
+Listens on port `7034`. Exposes `/health` and `GET /alerts`.
 
 ## Test
 

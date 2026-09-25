@@ -37,7 +37,7 @@ mvn package
 java -jar target/staffing-service.jar
 ```
 
-Listens on port `7033`.
+Listens on port `7033`. Exposes `/health` and `GET /schedule/{wardId}`.
 
 ## Test
 

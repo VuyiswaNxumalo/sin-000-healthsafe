@@ -31,7 +31,7 @@ mvn package
 java -jar target/alert-level-service.jar
 ```
 
-Listens on port `7032`.
+Listens on port `7032`. Exposes `/health`, `GET /alert-level`, and `PUT /alert-level`.
 
 ## Test
 

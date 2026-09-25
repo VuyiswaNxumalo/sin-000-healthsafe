@@ -34,7 +34,7 @@ mvn package
 java -jar target/ward-service.jar
 ```
 
-Listens on port `7031`.
+Listens on port `7031`. Exposes `/health`, `GET /wards`, `GET /wards/{id}`, and `GET /wards/{id}/staffing`.
 
 ## Test
 
